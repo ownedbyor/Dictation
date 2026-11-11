@@ -8,6 +8,7 @@ Spelling-dictation practice app for a 4th-grade girl, in Hebrew and English. Mob
 |---|---|---|
 | Frontend | `index.html` (single file: HTML + CSS + vanilla JS) | Hosted on GitHub Pages from `main`. Every push to `main` goes live in ~1 min. |
 | PWA shell | `manifest.webmanifest`, `sw.js`, `icons/` | Network-first service worker; English mode works offline. |
+| Natural voice | `supabase/functions/dictation-tts/index.ts`, `phrases.js` | Gemini TTS (voice `Kore`) → WAV cached in the public Storage bucket `tts` at `<lang>/<sha256('\|Kore\|'+lang+'\|'+text)>.wav`. The client computes that URL itself and plays cached clips straight from storage; uncached clips are rendered on demand; anything not ready within ~2.5 s falls back to the device voice. |
 | Hebrew word generation | `supabase/functions/dictation-words/index.ts` | Supabase Edge Function → Gemini (generate + review pass, JSON schema output). Secret: `GEMINI_API_KEY`. Optional `GEMINI_MODELS` (comma-separated fallback chain). |
 | Progress sync | Supabase table `public.progress` + RPCs `get_progress` / `save_progress` | See `supabase/migrations/`. The browser only knows the anon key; RLS blocks direct table access, so a record is reachable only by its code. |
 
@@ -15,7 +16,7 @@ Supabase project ref: `ugtqcfrtstfpzbhxybdm` (region eu-central-1).
 
 ## Conventions
 
-- Keep `index.html` dependency-free (no build step, no framework). If it grows past ~1,500 lines, split JS into ES modules under `js/` — still no bundler.
+- Keep the frontend dependency-free (no build step, no framework): `index.html` plus `phrases.js`. If it grows past ~1,500 lines, split JS into ES modules under `js/` — still no bundler.
 - UI language: Hebrew, RTL. Copy addresses the child in feminine second person (כתבי, הקשיבי).
 - All colors come from CSS custom properties in `:root`, with dark-mode overrides in the `prefers-color-scheme: dark` block.
 - Use `el.hidden` to toggle visibility (`[hidden]{display:none!important}` is global).
@@ -24,6 +25,13 @@ Supabase project ref: `ugtqcfrtstfpzbhxybdm` (region eu-central-1).
 - Answer comparison ignores niqqud / case / punctuation via `norm(text, lang)`.
 - Hard-word keys: Hebrew letters only for Hebrew, `en:<word>` for English. Mastered words become tombstones `{ del:true, u }` so deletions sync across devices.
 
+## Speech
+
+- Every spoken line is a list of parts `[{ t, g }]` passed to `speak(parts, rate)`. Prefer fixed phrases from `phrases.js` (letter names carry full niqqud so they are read correctly).
+- Corrections say only the wrong letter: "כִּמְעַט! כּוֹתְבִים חֵית. וְלֹא כָּף." Several wrong letters → a single generic line. Never spell a whole Hebrew word aloud.
+- Fixed clips are pre-rendered by the `tts-warm` cron job (queue `private.tts_warm`, unschedules itself when done) or by `node tools/warm-phrases.mjs`. After changing any phrase text, re-run the warm script.
+- Gemini TTS on the free key is rate-limited per minute (HTTP 429); the function retries with backoff in warm mode and the client falls back to the device voice.
+
 ## English word bank
 
 Fixed, hand-checked lists `EN_NUM` (1–20) and `EN_COL` (11 colors) in `index.html`. To add a topic: add an array in the same shape, a button in `#topics`, and a branch in `enList()`. Every sentence must contain its word exactly.
@@ -31,7 +39,7 @@ Fixed, hand-checked lists `EN_NUM` (1–20) and `EN_COL` (11 colors) in `index.h
 ## Deploying
 
 - Frontend: commit and push to `main`.
-- Edge Function: `supabase functions deploy dictation-words --project-ref ugtqcfrtstfpzbhxybdm`
+- Edge Functions: `supabase functions deploy dictation-words --project-ref ugtqcfrtstfpzbhxybdm` (same for `dictation-tts`)
 - Bump `CACHE` in `sw.js` when adding files to the precached shell.
 
 ## Testing checklist

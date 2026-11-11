@@ -66,6 +66,8 @@ canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:5}
 .seg button small{display:block;color:var(--muted);font-size:13px}
 .seg.two{grid-template-columns:repeat(2,1fr)}
 .cue{display:flex;justify-content:center;margin-top:16px}
+.swap{display:flex;align-items:center;justify-content:center;gap:14px;margin:8px 0;font-size:44px;font-weight:700}
+.swap b{color:var(--ok)}.swap s{color:var(--red)}.swap span{font-size:20px;font-weight:500;color:var(--muted)}
 .swatch{width:68px;height:68px;border-radius:50%;border:3px solid var(--line);display:block}
 .digit{font-family:var(--display);font-size:60px;line-height:1;color:var(--blue)}
 .seg button[aria-pressed=true]{border-color:var(--blue);background:var(--blue2);color:var(--blue);font-weight:700}
@@ -122,18 +124,20 @@ canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:5}
 <label for='kbOn'>מקלדת על המסך <input type='checkbox' id='kbOn'></label>
 <label for='sfxOn'>צלילים <input type='checkbox' id='sfxOn'></label>
 <label for='autoOn'>השמעה אוטומטית של המילה הבאה <input type='checkbox' id='autoOn'></label>
-<label for='voiceSel'>קול <select id='voiceSel'><option value='auto'>אוטומטי</option><option value='device'>קול המכשיר</option><option value='web'>קול מהאינטרנט</option></select></label>
+<label for='voiceSel'>קול <select id='voiceSel'><option value='auto'>קול טבעי (מומלץ)</option><option value='device'>קול המכשיר</option></select></label>
 <button class='ghost' id='testVoice'>🔊 בדיקת קול</button>
 <button class='ghost' id='setClose'>סגירה</button>
 <p class='small' id='voiceInfo'></p>
 </section>
 <div id='warn' class='warn' hidden>🔇 לא הצלחתי להשמיע קול. נסו לפתוח את הלינק בטלפון או בדפדפן Edge, ובדקו שהשמע לא מושתק.</div>
 </div>
+<script src='phrases.js'></script>
 <script>
 var $=function(id){ return document.getElementById(id); };
 var NL=String.fromCharCode(10);
 var store={ get:function(k,d){ try{ var v=localStorage.getItem('dict_'+k); return v ? JSON.parse(v) : d; }catch(e){ return d; } }, set:function(k,v){ try{ localStorage.setItem('dict_'+k,JSON.stringify(v)); }catch(e){ } } };
 var S=store.get('settings',null) || { rate:0.9, kb:false, sfx:true, auto:true, voice:'auto' };
+if(S.voice!=='device'){ S.voice='auto'; }
 if(['easy','medium','hard'].indexOf(S.level)<0){ S.level='medium'; }
 S.count=Math.min(50,Math.max(20,parseInt(S.count,10) || 20));
 if(['he','en'].indexOf(S.lang)<0){ S.lang='he'; }
@@ -188,26 +192,41 @@ function heOnly(s){ s=String(s||''); var o=''; for(var k=0;k<s.length;k++){ var 
 function esc(s){ return String(s).split('&').join('&amp;').split('<').join('&lt;'); }
 function today(){ var d=new Date(); return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate(); }
 
-/* ---------- letters ---------- */
-var LN={'א':'אלף','ב':'בית','ג':'גימל','ד':'דלת','ה':'הֵא','ו':'וָו','ז':'זַיִן','ח':'חית','ט':'טית','י':'יוד','כ':'כף','ך':'כף סופית','ל':'למד','מ':'מם','ם':'מם סופית','נ':'נון','ן':'נון סופית','ס':'סמך','ע':'עין','פ':'פֵּא','ף':'פֵּא סופית','צ':'צָדִי','ץ':'צָדִי סופית','ק':'קוף','ר':'ריש','ש':'שין','ת':'תָּו'};
-function spell(w,g){ if(g==='en'){ return norm(w,'en').split('').join(', '); } return heOnly(w).split('').map(function(c){ return LN[c] || c; }).join(', '); }
-
-/* ---------- speech ---------- */
-var heVoice=null, enVoice=null, curAudio=null, tok=0, voiceFailed=false;
+/* ---------- speech ----------
+   Natural voice: every phrase is a WAV clip rendered once by the dictation-tts Edge Function (Gemini TTS) and
+   cached in Supabase Storage under sha256('|'+VOICE+'|'+lang+'|'+text). The client computes that URL itself,
+   so cached clips play straight from storage; uncached ones are rendered on demand. Anything that is not ready
+   in time is read by the device voice instead, so speech never stalls. Fixed phrases live in phrases.js. */
+var VOICE='Kore', SB_URL='https://ugtqcfrtstfpzbhxybdm.supabase.co', TTS_FN=SB_URL+'/functions/v1/dictation-tts';
+var heVoice=null, enVoice=null, tok=0, urlCache={ }, renderJobs={ };
+var player=new Audio(); player.preload='auto';
+var SILENT='data:audio/wav;base64,UklGRmQGAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YUAGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+var unlocked=false;
+function unlockAudio(){ if(unlocked){ return; } unlocked=true; try{ player.src=SILENT; var p=player.play(); if(p && p.catch){ p.catch(function(){ unlocked=false; }); } }catch(e){ unlocked=false; } }
+document.addEventListener('pointerdown',unlockAudio,true); document.addEventListener('keydown',unlockAudio,true);
 function loadVoices(){ if(!window.speechSynthesis){ return; } var vs=speechSynthesis.getVoices(); heVoice=null; enVoice=null; for(var k=0;k<vs.length;k++){ if(!heVoice && /^(he|iw)/i.test(vs[k].lang)){ heVoice=vs[k]; } if(/^en/i.test(vs[k].lang) && (!enVoice || /^en-US/i.test(vs[k].lang) && !/^en-US/i.test(enVoice.lang))){ enVoice=vs[k]; } } showVoiceInfo(); }
 function voiceFor(g){ return g==='en' ? enVoice : heVoice; }
-function useDevice(g){ if(S.voice==='web'){ return false; } if(S.voice==='device'){ return !!window.speechSynthesis; } return !!voiceFor(g || 'he'); }
-function showVoiceInfo(){ $('voiceInfo').textContent = useDevice('he') ? ('משתמשים בקול של המכשיר' + (heVoice ? ' ('+heVoice.name+')' : '')) : 'משתמשים בקול עברי מהאינטרנט'; }
-function stopSpeak(){ tok++; try{ speechSynthesis.cancel(); }catch(e){ } if(curAudio){ curAudio.pause(); curAudio=null; } setTalking(false); }
+function showVoiceInfo(){ $('voiceInfo').textContent = S.voice==='device' ? 'משתמשים בקול של המכשיר'+(heVoice ? ' ('+heVoice.name+')' : '') : 'קול טבעי מהשרת. כשאין חיבור, קול המכשיר מחליף אותו.'; }
 function setTalking(on){ $('play').classList.toggle('talk',on); }
-function chunks(t){ var out=[]; t.split('.').forEach(function(s){ s=s.trim(); if(!s){ return; } while(s.length>180){ var cut=s.lastIndexOf(' ',180); if(cut<40){ cut=180; } out.push(s.slice(0,cut)); s=s.slice(cut).trim(); } out.push(s); }); return out; }
-function playUrl(url,rate){ return new Promise(function(res){ var a=new Audio(url); curAudio=a; a.playbackRate=rate; a.onended=function(){ res(true); }; a.onerror=function(){ res(false); }; var p=a.play(); if(p && p.catch){ p.catch(function(){ res(false); }); } }); }
-function speak(text,rate,g){ stopSpeak(); var my=tok; rate=rate || S.rate; g=g || 'he'; setTalking(true);
- var done=function(ok){ if(my===tok){ setTalking(false); } if(ok===false){ voiceFailed=true; $('warn').hidden=false; } };
- if(useDevice(g)){ return new Promise(function(res){ var u=new SpeechSynthesisUtterance(text); u.lang= g==='en' ? 'en-US' : 'he-IL'; var v=voiceFor(g); if(v){ u.voice=v; } u.rate=rate; u.onend=function(){ done(true); res(); }; u.onerror=function(){ done(true); res(); }; speechSynthesis.speak(u); }); }
- var parts=chunks(text), p=Promise.resolve(true);
- parts.forEach(function(t){ p=p.then(function(ok){ if(my!==tok || ok===false){ return ok; } return playUrl('https://translate.google.com/translate_tts?ie=UTF-8&tl='+(g==='en' ? 'en' : 'iw')+'&client=tw-ob&q='+encodeURIComponent(t), rate); }); });
- return p.then(function(ok){ done(ok); }); }
+function stopSpeak(){ tok++; try{ speechSynthesis.cancel(); }catch(e){ } try{ player.pause(); }catch(e){ } setTalking(false); }
+function hex(buf){ return Array.prototype.map.call(new Uint8Array(buf),function(b){ return ('0'+b.toString(16)).slice(-2); }).join(''); }
+function clipUrl(t,g){ var k=g+'|'+t; if(urlCache[k]){ return Promise.resolve(urlCache[k]); } if(!(window.crypto && crypto.subtle)){ return Promise.resolve(null); }
+ return crypto.subtle.digest('SHA-256',new TextEncoder().encode('|'+VOICE+'|'+g+'|'+t)).then(function(b){ return urlCache[k]=SB_URL+'/storage/v1/object/public/tts/'+g+'/'+hex(b)+'.wav'; }); }
+function renderClip(t,g){ var k=g+'|'+t; if(!renderJobs[k]){ renderJobs[k]=fetch(TTS_FN,{ method:'POST', headers:{ 'Content-Type':'application/json', 'apikey':SBK, 'Authorization':'Bearer '+SBK }, body:JSON.stringify({ text:t, lang:g }) }).then(function(r){ return r.json(); }).then(function(d){ if(!d || !d.url){ throw new Error('tts'); } urlCache[k]=d.url; return d.url; }); renderJobs[k].catch(function(){ delete renderJobs[k]; }); } return renderJobs[k]; }
+function wait(ms){ return new Promise(function(res){ setTimeout(function(){ res(null); },ms); }); }
+function playClip(url,rate,my){ return new Promise(function(res){ if(!url || my!==tok){ res(url ? 'stop' : 'err'); return; } player.onended=function(){ res('ok'); }; player.onerror=function(){ res('err'); }; player.src=url; try{ player.preservesPitch=true; }catch(e){ } player.playbackRate=rate; var p=player.play(); if(p && p.catch){ p.catch(function(){ res('err'); }); } }); }
+function devSay(t,rate,g,my){ return new Promise(function(res){ if(my!==tok || !window.speechSynthesis){ res(); return; } var u=new SpeechSynthesisUtterance(t); u.lang= g==='en' ? 'en-US' : 'he-IL'; var v=voiceFor(g); if(v){ u.voice=v; } u.rate=rate; u.onend=function(){ res(); }; u.onerror=function(){ res(); }; speechSynthesis.speak(u); }); }
+function sayPart(part,rate,my){ var t=part.t, g=part.g || 'he', play=Math.min(1.4,Math.max(0.6,rate/0.9));
+ if(S.voice==='device'){ return devSay(t,rate,g,my); }
+ return clipUrl(t,g).then(function(u){ return playClip(u,play,my); }).then(function(st){ if(st!=='err' || my!==tok){ return; }
+  return Promise.race([renderClip(t,g).catch(function(){ return null; }), wait(2500)]).then(function(u){ return u ? playClip(u,play,my) : 'err'; }).then(function(st2){ if(st2==='err' && my===tok){ return devSay(t,rate,g,my); } }); }); }
+// speak(text, rate, lang) or speak([{ t, g }, ...], rate): plays the parts in order.
+function speak(parts,rate,g){ if(typeof parts==='string'){ parts=[{ t:parts, g:g || 'he' }]; } stopSpeak(); var my=tok; rate=rate || S.rate; setTalking(true);
+ var p=Promise.resolve(); parts.forEach(function(part){ p=p.then(function(){ if(my===tok){ return sayPart(part,rate,my); } }); });
+ return p.then(function(){ if(my===tok){ setTalking(false); } }); }
+// Render clips in the background (2 at a time) so they are ready before they are needed.
+function warmClips(parts){ if(S.voice==='device'){ return; } var q=parts.slice(), run=function(){ var part=q.shift(); if(!part){ return; } clipUrl(part.t,part.g).then(function(u){ return fetch(u,{ method:'HEAD' }).then(function(r){ if(!r.ok){ return renderClip(part.t,part.g); } }); }).catch(function(){ }).then(run); }; run(); run(); }
+function warmItems(list){ warmClips(list.map(function(it){ return { t:PH.item(it), g:gOf(it) }; })); }
 
 /* ---------- sound effects ---------- */
 var AC=null;
@@ -217,7 +236,7 @@ function sOk(){ tone([660,880],0.12); } function sNo(){ tone([300,220],0.16,'tri
 /* ---------- data ---------- */
 var pending=null, curLevel=S.level;
 var WORDS_FN='https://ugtqcfrtstfpzbhxybdm.supabase.co/functions/v1/dictation-words';
-function fetchWords(level,n){ return fetch(WORDS_FN,{ method:'POST', cache:'no-store', headers:{ 'Content-Type':'application/json', 'apikey':SBK, 'Authorization':'Bearer '+SBK }, body:JSON.stringify({ level:level, n:n }) }).then(function(r){ return r.json().then(function(d){ if(!r.ok || !d.items){ var e=new Error((d && d.error) || ('http '+r.status)); throw e; } return d.items; }); }).then(function(list){ var seen={ }; return list.filter(function(it){ var k=heOnly(it.w); if(!k || seen[k]){ return false; } seen[k]=1; return true; }).slice(0,n); }); }
+function fetchWords(level,n){ return fetch(WORDS_FN,{ method:'POST', cache:'no-store', headers:{ 'Content-Type':'application/json', 'apikey':SBK, 'Authorization':'Bearer '+SBK }, body:JSON.stringify({ level:level, n:n }) }).then(function(r){ return r.json().then(function(d){ if(!r.ok || !d.items){ var e=new Error((d && d.error) || ('http '+r.status)); throw e; } return d.items; }); }).then(function(list){ var seen={ }; return list.filter(function(it){ var k=heOnly(it.w); if(!k || seen[k]){ return false; } seen[k]=1; return true; }).slice(0,n); }).then(function(list){ warmItems(list); return list; }); }
 function getWords(level,n){ var key=level+'|'+n; if(pending && pending.key===key){ var p=pending.p; pending=null; return p; } return fetchWords(level,n); }
 function prefetch(){ pending={ key:S.level+'|'+S.count, p:fetchWords(S.level,S.count) }; pending.p.catch(function(){ pending=null; }); }
 function load(level,n,m){ show('vLoad'); $('loadTxt').textContent='מכינה לך '+n+' מילים ברמה '+LVL[level]+'…'; curLevel=level;
@@ -238,9 +257,9 @@ function renderStart(){ renderHeader(); var h=hardList(), en=S.lang==='en'; $('h
  var last=hist[hist.length-1]; $('lastLine').textContent= last ? 'בפעם הקודמת: '+last.s+' מתוך '+last.n+' נכון'+(last.l && LBL[last.l] ? ' ('+LBL[last.l]+')' : '') : 'טיפ: אפשר ללחוץ Enter במקום על הכפתורים.'; }
 function show(view){ ['vStart','vLoad','vQuiz','vDone','vSet'].forEach(function(v){ $(v).hidden = v!==view; }); }
 
-function begin(list,m){ if(!list.length){ location.reload(); return; } mode=m; items=list.slice(); i=0; score=0; wrong=[]; sessStars=0; results=items.map(function(){ return ''; }); show('vQuiz'); buildKb(); next(true); }
+function begin(list,m){ if(!list.length){ location.reload(); return; } mode=m; items=list.slice(); i=0; score=0; wrong=[]; sessStars=0; results=items.map(function(){ return ''; }); show('vQuiz'); buildKb(); warmItems(items); next(true); }
 function dots(){ var h=''; for(var k=0;k<items.length;k++){ h+='<span class='+(k===i ? 'dot cur' : 'dot '+results[k])+'></span>'; } $('dots').innerHTML=h; }
-function sayItem(rate){ var it=items[i]; return speak(it.w+'. '+it.s+'. '+it.w+'.',rate,gOf(it)); }
+function sayItem(rate){ var it=items[i]; return speak([{ t:PH.item(it), g:gOf(it) }],rate); }
 function renderCue(it){ var c=$('cue'); if(it.c){ c.innerHTML='<span class=swatch style=background:'+it.c+'></span>'; c.hidden=false; } else if(it.v){ c.innerHTML='<span class=digit>'+it.v+'</span>'; c.hidden=false; } else { c.innerHTML=''; c.hidden=true; } }
 function next(first){ checked=false; hinted=false; var it=items[i], g=gOf(it), dir= g==='en' ? 'ltr' : 'rtl'; $('progTxt').textContent='מילה '+(i+1)+' מתוך '+items.length; $('sessStars').textContent='⭐ '+sessStars; dots();
  renderCue(it); $('sent').dir=dir; $('ans').dir=dir; $('ans').setAttribute('lang',g); buildKb(g);
@@ -249,22 +268,24 @@ function next(first){ checked=false; hinted=false; var it=items[i], g=gOf(it), d
  if(!S.kb){ $('ans').focus(); }
  if(first || S.auto){ setTimeout(function(){ sayItem(); },150); } }
 function useHint(){ if(checked || hinted){ return; } hinted=true; $('hint').disabled=true; var it=items[i], g=gOf(it), w=norm(it.w,g); $('ans').placeholder='מתחילה ב־'+w[0]+' ('+w.length+' אותיות)';
- if(g==='en'){ speak('It starts with the letter '+w[0]+'. It has '+w.length+' letters.',null,'en'); } else { speak('המילה מתחילה באות '+(LN[w[0]] || w[0])+', ויש בה '+w.length+' אותיות.'); } }
+ speak([{ t: g==='en' ? PH.en.starts(w[0]) : PH.he.starts(w[0]), g:g }]); }
 function letterDiff(a,it){ var g=gOf(it), A=norm(a,g), W=norm(it.w,g), h=''; for(var k=0;k<W.length;k++){ var bad = A.length!==W.length || A[k]!==W[k]; h+='<span'+(bad ? ' class=bad' : '')+'>'+W[k]+'</span>'; } return h; }
-function wrongSpeech(a,it){ var g=gOf(it), w=it.w, A=norm(a,g), W=norm(w,g), d=[]; if(A.length===W.length){ for(var k=0;k<W.length;k++){ if(A[k]!==W[k]){ d.push(k); } } }
- if(g==='en'){ var m='Almost. '; if(d.length===1){ m+='Write '+W[d[0]]+', not '+A[d[0]]+'. '; } return m+w+' is spelled: '+spell(w,'en')+'.'; }
- var msg='כמעט. '; if(d.length===1){ msg+='במילה '+w+' כותבים '+LN[W[d[0]]]+', ולא '+(LN[A[d[0]]] || A[d[0]])+'. '; } msg+='כותבים '+w+': '+spell(w)+'.'; return msg; }
+function diffAt(a,it){ var g=gOf(it), A=norm(a,g), W=norm(it.w,g), d=[]; if(A.length===W.length){ for(var k=0;k<W.length;k++){ if(A[k]!==W[k]){ d.push(k); } } } return d.length===1 ? { right:W[d[0]], wrong:A[d[0]] } : null; }
+// Short, clear correction: only the letter that was wrong, never the whole word letter by letter.
+function wrongParts(a,it){ var g=gOf(it), P= g==='en' ? PH.en : PH.he, x=diffAt(a,it), parts= x ? [{ t:P.almost, g:g },{ t:P.write(x.right), g:g },{ t:P.not(x.wrong), g:g }] : [{ t:P.look, g:g }];
+ if(g==='en'){ parts.push({ t:PH.en.spelled(it.w), g:'en' }); } return parts; }
 var PRAISE=['מצוין!','כל הכבוד!','יפה מאוד!','נכון!','אלופה!','בדיוק ככה!'];
 function check(){ if(checked){ advance(); return; } var it=items[i], g=gOf(it), a=$('ans').value.trim(); if(!norm(a,g)){ $('ans').focus(); return; } checked=true; $('ans').disabled=true; $('hint').disabled=true;
  var ok=isOk(a,it), fb=$('fb'); fb.hidden=false; fb.className='fb '+(ok ? 'ok' : 'no');
  var key=keyOf(it), wd='<div class=word dir='+(g==='en' ? 'ltr' : 'rtl')+'>', mean= it.h ? '<p class=tip>בעברית: <b>'+esc(it.h)+'</b></p>' : '';
- if(ok){ score++; results[i]='ok'; if(!hinted){ sessStars++; starsTot++; } var bank= g==='en' ? EN_PRAISE : PRAISE, pr=bank[Math.floor(Math.random()*bank.length)];
+ if(ok){ score++; results[i]='ok'; if(!hinted){ sessStars++; starsTot++; } var bank= g==='en' ? EN_PRAISE : PRAISE, pi=Math.floor(Math.random()*bank.length), pr=bank[pi];
   fb.innerHTML='<div class=verdict>✔ '+pr+(hinted ? '' : ' ⭐')+'</div>'+wd+esc(it.w)+'</div>'+mean+'<p class=tip>💡 '+esc(it.t)+'</p>';
-  sOk(); speak(pr,null,g);
+  sOk(); speak([{ t:(g==='en' ? PH.en.praise : PH.he.praise)[pi], g:g }]);
   if(hard[key] && !hard[key].del){ hard[key].ok=(hard[key].ok || 0)+1; hard[key].u=Date.now(); if(mode==='hard' && hard[key].ok>=2){ hard[key]={ w:it.w, del:true, u:Date.now() }; } }
  } else { results[i]='no'; wrong.push(it);
-  fb.innerHTML='<div class=verdict>כמעט!</div><div class=mine>כתבת: <s>'+esc(a)+'</s></div>'+wd+letterDiff(a,it)+'</div>'+mean+'<p class=tip>💡 '+esc(it.t)+'</p>';
-  sNo(); speak(wrongSpeech(a,it)+(g==='en' ? '' : ' '+it.t),null,g);
+  var x=diffAt(a,it), sw= x ? '<div class=swap dir='+(g==='en' ? 'ltr' : 'rtl')+'><b>'+esc(x.right)+'</b><span>'+(g==='en' ? 'not' : 'ולא')+'</span><s>'+esc(x.wrong)+'</s></div>' : '';
+  fb.innerHTML='<div class=verdict>כמעט!</div><div class=mine>כתבת: <s>'+esc(a)+'</s></div>'+wd+letterDiff(a,it)+'</div>'+sw+mean+'<p class=tip>💡 '+esc(it.t)+'</p>';
+  sNo(); speak(wrongParts(a,it));
   hard[key]={ w:it.w, s:it.s, t:it.t, g:it.g, h:it.h, v:it.v, c:it.c, alt:it.alt, miss:((hard[key] && !hard[key].del && hard[key].miss) || 0)+1, ok:0, u:Date.now() };
  }
  store.set('hard',hard); store.set('stars',starsTot); queueSave(); dots(); $('sessStars').textContent='⭐ '+sessStars; renderHeader();
@@ -278,7 +299,7 @@ function finish(){ stopSpeak(); if(mode==='daily'){ hist.push({ d:today(), s:sco
  $('vDone').innerHTML=h; show('vDone');
  if(wrong.length){ $('retry').onclick=function(){ begin(wrong,'retry'); }; }
  $('more').onclick= isEn ? function(){ begin(shuffle(enList()),'daily'); } : function(){ load(curLevel,10,'daily'); }; $('again').onclick=function(){ renderStart(); show('vStart'); };
- sWin(); if(pct>=0.8){ confetti(); } speak('סיימת! '+score+' מתוך '+items.length+' נכון.'+(wrong.length ? ' בואי נתרגל שוב את המילים שהיו קשות.' : ' כל הכבוד!')); }
+ sWin(); if(pct>=0.8){ confetti(); } speak([{ t:PH.he.done, g:'he' }]); }
 
 /* ---------- on-screen keyboard ---------- */
 var ROWS=['קראטוןםפ','שדגכעיחלךף','זסבהנמצתץ'];
@@ -298,7 +319,7 @@ $('kbOn').onchange=function(){ S.kb=this.checked; saveS(); buildKb(gOf(items[i])
 $('sfxOn').onchange=function(){ S.sfx=this.checked; saveS(); };
 $('autoOn').onchange=function(){ S.auto=this.checked; saveS(); };
 $('voiceSel').onchange=function(){ S.voice=this.value; saveS(); $('warn').hidden=true; showVoiceInfo(); };
-$('testVoice').onclick=function(){ $('warn').hidden=true; speak('שלום! אני אקריא לך את המילים בהכתבה.'); };
+$('testVoice').onclick=function(){ $('warn').hidden=true; speak([{ t:PH.he.test, g:'he' }]); };
 var prevView='vStart';
 $('setBtn').onclick=function(){ if(!$('vSet').hidden){ show(prevView); return; } ['vStart','vQuiz','vDone'].forEach(function(v){ if(!$(v).hidden){ prevView=v; } }); show('vSet'); };
 $('setClose').onclick=function(){ show(prevView); };
