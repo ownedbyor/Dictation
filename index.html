@@ -41,6 +41,8 @@ input#ans{width:100%;font-family:var(--body);font-size:34px;font-weight:500;padd
 .verdict{font-family:var(--display);font-size:24px}
 .fb.ok .verdict{color:var(--ok)}.fb.no .verdict{color:var(--red)}
 .word{font-size:36px;font-weight:700;letter-spacing:3px;margin:6px 0}
+.word span{transition:background .15s}
+.word span.say{background:var(--pencil);color:var(--ink);border-radius:6px}
 .word span.bad{color:var(--red);text-decoration:underline wavy;text-underline-offset:6px}
 .mine{color:var(--muted)}.mine s{color:var(--red)}
 .tip{margin:8px 0 0;font-size:18px}
@@ -221,9 +223,10 @@ function sayPart(part,rate,my){ var t=part.t, g=part.g || 'he', play=Math.min(1.
  return clipUrl(t,g).then(function(u){ return playClip(u,play,my); }).then(function(st){ if(st!=='err' || my!==tok){ return; }
   return Promise.race([renderClip(t,g).catch(function(){ return null; }), wait(2500)]).then(function(u){ return u ? playClip(u,play,my) : 'err'; }).then(function(st2){ if(st2==='err' && my===tok){ return devSay(t,rate,g,my); } }); }); }
 // speak(text, rate, lang) or speak([{ t, g }, ...], rate): plays the parts in order.
+function markLetter(k){ [].forEach.call(document.querySelectorAll('#fb .word span'),function(el,n){ el.classList.toggle('say',n===k); }); }
 function speak(parts,rate,g){ if(typeof parts==='string'){ parts=[{ t:parts, g:g || 'he' }]; } stopSpeak(); var my=tok; rate=rate || S.rate; setTalking(true);
- var p=Promise.resolve(); parts.forEach(function(part){ p=p.then(function(){ if(my===tok){ return sayPart(part,rate,my); } }); });
- return p.then(function(){ if(my===tok){ setTalking(false); } }); }
+ var p=Promise.resolve(); parts.forEach(function(part){ p=p.then(function(){ if(my===tok){ markLetter(part.hl==null ? -1 : part.hl); return sayPart(part,rate,my); } }); });
+ return p.then(function(){ if(my===tok){ setTalking(false); markLetter(-1); } }); }
 // Render clips in the background (2 at a time) so they are ready before they are needed.
 function warmClips(parts){ if(S.voice==='device'){ return; } var q=parts.slice(), run=function(){ var part=q.shift(); if(!part){ return; } clipUrl(part.t,part.g).then(function(u){ return fetch(u,{ method:'HEAD' }).then(function(r){ if(!r.ok){ return renderClip(part.t,part.g); } }); }).catch(function(){ }).then(run); }; run(); run(); }
 function warmItems(list){ warmClips(list.map(function(it){ return { t:PH.item(it), g:gOf(it) }; })); }
@@ -271,9 +274,14 @@ function useHint(){ if(checked || hinted){ return; } hinted=true; $('hint').disa
  speak([{ t: g==='en' ? PH.en.starts(w[0]) : PH.he.starts(w[0]), g:g }]); }
 function letterDiff(a,it){ var g=gOf(it), A=norm(a,g), W=norm(it.w,g), h=''; for(var k=0;k<W.length;k++){ var bad = A.length!==W.length || A[k]!==W[k]; h+='<span'+(bad ? ' class=bad' : '')+'>'+W[k]+'</span>'; } return h; }
 function diffAt(a,it){ var g=gOf(it), A=norm(a,g), W=norm(it.w,g), d=[]; if(A.length===W.length){ for(var k=0;k<W.length;k++){ if(A[k]!==W[k]){ d.push(k); } } } return d.length===1 ? { right:W[d[0]], wrong:A[d[0]] } : null; }
-// Short, clear correction: only the letter that was wrong, never the whole word letter by letter.
-function wrongParts(a,it){ var g=gOf(it), P= g==='en' ? PH.en : PH.he, x=diffAt(a,it), parts= x ? [{ t:P.almost, g:g },{ t:P.write(x.right), g:g },{ t:P.not(x.wrong), g:g }] : [{ t:P.look, g:g }];
- if(g==='en'){ parts.push({ t:PH.en.spelled(it.w), g:'en' }); } return parts; }
+// Correction: name the wrong letter (when exactly one is wrong), then spell the right word letter by letter.
+// Each Hebrew letter is its own clip; `hl` highlights that letter on screen while it is read.
+function wrongParts(a,it){ var g=gOf(it), P= g==='en' ? PH.en : PH.he, x=diffAt(a,it), parts=[{ t:P.almost, g:g }];
+ if(x){ parts.push({ t:P.write(x.right), g:g },{ t:P.not(x.wrong), g:g }); }
+ if(g==='en'){ parts.push({ t:PH.en.spelled(it.w), g:'en' }); return parts; }
+ parts.push({ t:PH.he.spellIntro, g:'he' });
+ heOnly(it.w).split('').forEach(function(c,k){ parts.push({ t:PH.he.letter(c), g:'he', hl:k }); });
+ return parts; }
 var PRAISE=['מצוין!','כל הכבוד!','יפה מאוד!','נכון!','אלופה!','בדיוק ככה!'];
 function check(){ if(checked){ advance(); return; } var it=items[i], g=gOf(it), a=$('ans').value.trim(); if(!norm(a,g)){ $('ans').focus(); return; } checked=true; $('ans').disabled=true; $('hint').disabled=true;
  var ok=isOk(a,it), fb=$('fb'); fb.hidden=false; fb.className='fb '+(ok ? 'ok' : 'no');

@@ -18,6 +18,8 @@
       write: function (c) { return 'כּוֹתְבִים ' + LNQ[c] + '.'; },
       not: function (c) { return 'וְלֹא ' + LNQ[c] + '.'; },
       starts: function (c) { return 'הַמִּלָּה מַתְחִילָה בָּאוֹת ' + LNQ[c] + '.'; },
+      letter: function (c) { return LNQ[c] + '.'; },
+      spellIntro: 'כּוֹתְבִים כָּךְ:',
       almost: 'כִּמְעַט!',
       look: 'כִּמְעַט! תִּסְתַּכְּלִי עַל הָאוֹתִיּוֹת הָאֲדֻמּוֹת.',
       done: 'סִיַּמְתְּ! כׇּל הַכָּבוֹד!',
@@ -39,14 +41,14 @@
     all: function (enItems) {
       var out = [], he = PH.he, en = PH.en;
       Object.keys(LNQ).forEach(function (c) {
-        out.push({ text: he.write(c), lang: 'he' }, { text: he.not(c), lang: 'he' });
+        out.push({ text: he.letter(c), lang: 'he' }, { text: he.write(c), lang: 'he' }, { text: he.not(c), lang: 'he' });
         if (FINALS.indexOf(c) < 0) { out.push({ text: he.starts(c), lang: 'he' }); }
       });
-      [he.almost, he.look, he.done, he.test].concat(he.praise).forEach(function (t) { out.push({ text: t, lang: 'he' }); });
+      [he.almost, he.spellIntro, he.done, he.test].concat(he.praise).forEach(function (t) { out.push({ text: t, lang: 'he' }); });
       ABC.split('').forEach(function (c) {
         out.push({ text: en.write(c), lang: 'en' }, { text: en.not(c), lang: 'en' }, { text: en.starts(c), lang: 'en' });
       });
-      [en.almost, en.look].concat(en.praise).forEach(function (t) { out.push({ text: t, lang: 'en' }); });
+      [en.almost].concat(en.praise).forEach(function (t) { out.push({ text: t, lang: 'en' }); });
       (enItems || []).forEach(function (it) {
         out.push({ text: PH.item(it), lang: 'en' }, { text: en.spelled(it.w), lang: 'en' });
         (it.alt || []).forEach(function (a) { out.push({ text: en.spelled(a), lang: 'en' }); });

@@ -28,7 +28,7 @@ Supabase project ref: `ugtqcfrtstfpzbhxybdm` (region eu-central-1).
 ## Speech
 
 - Every spoken line is a list of parts `[{ t, g }]` passed to `speak(parts, rate)`. Prefer fixed phrases from `phrases.js` (letter names carry full niqqud so they are read correctly).
-- Corrections say only the wrong letter: "כִּמְעַט! כּוֹתְבִים חֵית. וְלֹא כָּף." Several wrong letters → a single generic line. Never spell a whole Hebrew word aloud.
+- Corrections: "כִּמְעַט!", then (if exactly one letter is wrong) "כּוֹתְבִים חֵית. וְלֹא כָּף.", then the correct word spelled letter by letter, one clip per letter ("כּוֹתְבִים כָּךְ: מֵם. חֵית. ..."). Parts with `hl:k` highlight letter k of the on-screen word while it is read.
 - Fixed clips are pre-rendered by the `tts-warm` cron job (queue `private.tts_warm`, unschedules itself when done) or by `node tools/warm-phrases.mjs`. After changing any phrase text, re-run the warm script.
 - Gemini TTS on the free key is rate-limited per minute (HTTP 429); the function retries with backoff in warm mode and the client falls back to the device voice.
 
