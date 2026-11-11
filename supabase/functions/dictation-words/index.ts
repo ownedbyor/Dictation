@@ -1,6 +1,6 @@
 // dictation-words: generates a Hebrew spelling dictation with Gemini.
 // POST { level: "easy" | "medium" | "hard", n: 5..50 }
-// → 200 { items: [{ w, s, t }], model }
+// → 200 { items: [{ w, s, t, wn?, sn? }], model }   (wn / sn = word / sentence with niqqud, used only for reading aloud)
 // Requires the secret GEMINI_API_KEY. Optional: GEMINI_MODELS (comma-separated, tried in order).
 
 const CORS = {
@@ -31,12 +31,14 @@ const SCHEMA = {
       word: { type: "STRING" },
       sentence: { type: "STRING" },
       tip: { type: "STRING" },
+      word_niqqud: { type: "STRING" },
+      sentence_niqqud: { type: "STRING" },
     },
-    required: ["word", "sentence", "tip"],
+    required: ["word", "sentence", "tip", "word_niqqud", "sentence_niqqud"],
   },
 };
 
-type Item = { word: string; sentence: string; tip: string };
+type Item = { word: string; sentence: string; tip: string; word_niqqud?: string; sentence_niqqud?: string };
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -61,6 +63,7 @@ FIELDS:
 - word: the word without niqqud, exactly as it should be written.
 - sentence: a short, natural, grammatically correct Hebrew sentence (5-9 words), no niqqud, containing word exactly once. Prefix letters (ה, ו, ב, ל, מ, ש, כ) may be attached to it as in normal writing, never separated by a space.
 - tip: "כותבים <letter name>, כמו ב<another real word from the SAME root containing that letter>", or only "כותבים <letter name>" when there is no such word. Allowed letter names: ${LETTER_NAMES}. Never invent roots or associations.
+- word_niqqud and sentence_niqqud: the same word and sentence with full, correct niqqud (and dagesh / shin-sin dots), so a text-to-speech voice pronounces them correctly. Keep EXACTLY the same letters, in the same order, as word and sentence; only add the vowel marks. Do not remove ו or י of the full spelling.
 
 Check every item before answering.`;
 }
@@ -71,6 +74,7 @@ function reviewPrompt(items: Item[]): string {
 1. word must be a real, common Hebrew word children know, correctly spelled in full spelling without niqqud. Replace rare, invented, misspelled or ambiguous words with a new valid item of the same difficulty, without duplicates.
 2. sentence must be natural, grammatical Hebrew (5-9 words, no niqqud) and contain word exactly as written (an attached prefix letter is fine). If it uses another form of the word, rewrite the sentence.
 3. tip must be "כותבים <letter name>, כמו ב<related word>" or "כותבים <letter name>". The letter must appear in word at its tricky spot. The related word must share the SAME root and contain that letter; if you are not completely sure (e.g. ארוחה/לאכול or תיאטרון/להציג do NOT share a root), keep only "כותבים <letter name>". Allowed letter names: ${LETTER_NAMES}.
+4. word_niqqud and sentence_niqqud must be word and sentence with full, correct niqqud for reading aloud: exactly the same letters in the same order (keep the ו and י of the full spelling), only vowel marks added. Fix wrong vowels; rewrite them to match after any change you made above.
 
 LIST:
 ${JSON.stringify(items)}`;
@@ -98,10 +102,18 @@ async function callGemini(model: string, key: string, prompt: string, timeoutMs:
 }
 
 const hebrewOnly = (s: string) => String(s ?? "").replace(/[^א-ת]/g, "");
+// Letters that matter for comparing a niqqud version with the plain text: Hebrew consonants only.
+// Punctuation, spaces and the ו / י of full spelling (often dropped when niqqud is added) are ignored.
+const skeleton = (s: string) => String(s ?? "").replace(/[\u0591-\u05C7]/g, "").replace(/[^א-ת]/g, "").replace(/[וי]/g, "");
+// Accept a niqqud version (used only for reading aloud) when it has the same consonants as the plain text.
+const niqqudOf = (plain: string, marked: unknown) => {
+  const m = String(marked ?? "").trim();
+  return m && m !== plain && /[\u05B0-\u05BC]/.test(m) && skeleton(m) === skeleton(plain) ? m : undefined;
+};
 
 function clean(items: Item[], n: number) {
   const seen = new Set<string>();
-  const out: { w: string; s: string; t: string }[] = [];
+  const out: { w: string; s: string; t: string; wn?: string; sn?: string }[] = [];
   for (const it of items) {
     const w = String(it?.word ?? "").trim();
     const s = String(it?.sentence ?? "").trim();
@@ -110,7 +122,8 @@ function clean(items: Item[], n: number) {
     if (!key || key !== w.replace(/[֑-ׇ]/g, "")) continue; // single Hebrew word, no spaces or Latin
     if (!s.includes(w) || seen.has(key)) continue;
     seen.add(key);
-    out.push({ w, s, t });
+    const wn = niqqudOf(w, it?.word_niqqud), sn = niqqudOf(s, it?.sentence_niqqud);
+    out.push({ w, s, t, ...(wn ? { wn } : {}), ...(sn ? { sn } : {}) });
     if (out.length >= n) break;
   }
   return out;

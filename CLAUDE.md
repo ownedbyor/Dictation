@@ -21,7 +21,7 @@ Supabase project ref: `ugtqcfrtstfpzbhxybdm` (region eu-central-1).
 - All colors come from CSS custom properties in `:root`, with dark-mode overrides in the `prefers-color-scheme: dark` block.
 - Use `el.hidden` to toggle visibility (`[hidden]{display:none!important}` is global).
 - localStorage keys are prefixed `dict_` and every access is wrapped in try/catch (`store.get` / `store.set`).
-- Words are objects `{ w, s, t }` (word, sentence, tip). English items add `g:'en'`, `h` (Hebrew meaning), `v` (digit) or `c` (hex color), optional `alt` (accepted alternatives).
+- Words are objects `{ w, s, t }` (word, sentence, tip). Hebrew items from the server may add `wn` / `sn`: the word and sentence with niqqud, used only for reading aloud (`PH.item`), never shown on screen. English items add `g:'en'`, `h` (Hebrew meaning), `v` (digit) or `c` (hex color), optional `alt` (accepted alternatives).
 - Answer comparison ignores niqqud / case / punctuation via `norm(text, lang)`.
 - Hard-word keys: Hebrew letters only for Hebrew, `en:<word>` for English. Mastered words become tombstones `{ del:true, u }` so deletions sync across devices.
 

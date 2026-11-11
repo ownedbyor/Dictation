@@ -294,7 +294,7 @@ function check(){ if(checked){ advance(); return; } var it=items[i], g=gOf(it), 
   var x=diffAt(a,it), sw= x ? '<div class=swap dir='+(g==='en' ? 'ltr' : 'rtl')+'><b>'+esc(x.right)+'</b><span>'+(g==='en' ? 'not' : 'ולא')+'</span><s>'+esc(x.wrong)+'</s></div>' : '';
   fb.innerHTML='<div class=verdict>כמעט!</div><div class=mine>כתבת: <s>'+esc(a)+'</s></div>'+wd+letterDiff(a,it)+'</div>'+sw+mean+'<p class=tip>💡 '+esc(it.t)+'</p>';
   sNo(); speak(wrongParts(a,it));
-  hard[key]={ w:it.w, s:it.s, t:it.t, g:it.g, h:it.h, v:it.v, c:it.c, alt:it.alt, miss:((hard[key] && !hard[key].del && hard[key].miss) || 0)+1, ok:0, u:Date.now() };
+  hard[key]={ w:it.w, s:it.s, t:it.t, wn:it.wn, sn:it.sn, g:it.g, h:it.h, v:it.v, c:it.c, alt:it.alt, miss:((hard[key] && !hard[key].del && hard[key].miss) || 0)+1, ok:0, u:Date.now() };
  }
  store.set('hard',hard); store.set('stars',starsTot); queueSave(); dots(); $('sessStars').textContent='⭐ '+sessStars; renderHeader();
  $('go').textContent = i<items.length-1 ? 'למילה הבאה ←' : 'לסיכום 🎉'; $('go').focus(); }

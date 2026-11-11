@@ -35,8 +35,8 @@
       look: 'Almost! Look at the red letters.',
       praise: ['Great!', 'Well done!', 'Excellent!', 'Perfect!', 'Super!', 'Good job!']
     },
-    // The clip read for every dictation item: word, sentence, word.
-    item: function (it) { return it.w + '. ' + it.s + ' ' + it.w + '.'; },
+    // The clip read for every dictation item: word, sentence, word. Uses the niqqud versions (wn / sn) when present.
+    item: function (it) { var w = it.wn || it.w; return w + '. ' + (it.sn || it.s) + ' ' + w + '.'; },
     // Every fixed clip, for pre-rendering. enItems = the English word bank.
     all: function (enItems) {
       var out = [], he = PH.he, en = PH.en;
