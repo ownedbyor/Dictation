@@ -9,7 +9,9 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const DEFAULT_MODELS = "gemini-3.8-flash,gemini-3-flash-preview,gemini-2.5-flash";
+// Tested 2026-11-11 on a free AI Studio key: 3-flash-preview ~1 s, 3.5/3.6-flash ~10 s (thinking),
+// 3.8-flash hung, 2.5-* returned 404, Pro/4-* returned 429 (no free quota).
+const DEFAULT_MODELS = "gemini-3-flash-preview,gemini-3.5-flash,gemini-3.1-flash-lite";
 
 const LEVELS: Record<string, string> = {
   easy: "short, very common everyday words (2-5 letters) with one tricky spot each, and very simple sentences",
@@ -74,11 +76,12 @@ LIST:
 ${JSON.stringify(items)}`;
 }
 
-async function callGemini(model: string, key: string, prompt: string): Promise<Item[]> {
+async function callGemini(model: string, key: string, prompt: string, timeoutMs: number): Promise<Item[]> {
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
     {
       method: "POST",
+      signal: AbortSignal.timeout(Math.max(5000, timeoutMs)),
       headers: { "Content-Type": "application/json", "x-goog-api-key": key },
       body: JSON.stringify({
         contents: [{ role: "user", parts: [{ text: prompt }] }],
@@ -117,23 +120,63 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
 
-  const key = Deno.env.get("GEMINI_API_KEY");
-  if (!key) return json({ error: "missing_key" }, 503);
+  const env = Deno.env.toObject();
+  const custom = Object.keys(env).filter((k) => !k.startsWith("SUPABASE_") && !k.startsWith("SB_") && !k.startsWith("DENO_"));
+  const keyName = ["GEMINI_API_KEY", ...custom.filter((k) => /GEMINI|GOOGLE_API/i.test(k))].find((k) => env[k]);
+  const key = keyName ? env[keyName].trim() : "";
+  // Report secret NAMES only (never values) so a misnamed secret is easy to spot.
+  if (!key) return json({ error: "missing_key", secret_names: custom.filter((k) => /KEY|API|GEMINI|GOOGLE/i.test(k)) }, 503);
 
   const body = await req.json().catch(() => ({}));
+
+  // Diagnostics: { probe: true } lists the models this key can use and pings a few of them.
+  if (body?.probe) {
+    const list = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", { headers: { "x-goog-api-key": key } })
+      .then((r) => r.json()).catch((e) => ({ error: String(e) }));
+    const names: string[] = (list?.models ?? [])
+      .filter((m: { supportedGenerationMethods?: string[] }) => (m.supportedGenerationMethods ?? []).includes("generateContent"))
+      .map((m: { name: string }) => m.name.replace("models/", ""))
+      .filter((n: string) => /^gemini/.test(n));
+    const toPing: string[] = (body.models ?? names.filter((n) => /flash|pro/.test(n) && !/image|tts|audio|live|embedding/.test(n))).slice(0, 8);
+    const pings = await Promise.all(toPing.map(async (m: string) => {
+      const t0 = Date.now();
+      try {
+        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+          body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: "Reply with the single word OK." }] }] }),
+          signal: AbortSignal.timeout(30000),
+        });
+        return { model: m, status: r.status, ms: Date.now() - t0 };
+      } catch (e) {
+        return { model: m, error: String(e).slice(0, 80), ms: Date.now() - t0 };
+      }
+    }));
+    return json({ key_name: keyName, available: names, pings });
+  }
   const level = ["easy", "medium", "hard"].includes(body?.level) ? body.level : "medium";
   const n = Math.min(50, Math.max(5, parseInt(body?.n, 10) || 20));
-  const models = (Deno.env.get("GEMINI_MODELS") || DEFAULT_MODELS).split(",").map((m) => m.trim()).filter(Boolean);
+  const models: string[] = Array.isArray(body?.models) && body.models.length
+    ? body.models.slice(0, 3).map(String)
+    : (Deno.env.get("GEMINI_MODELS") || DEFAULT_MODELS).split(",").map((m) => m.trim()).filter(Boolean);
 
+  // Supabase free tier stops a request at 150 s of wall-clock time; stay well inside it.
+  const deadline = Date.now() + 135_000;
+  const left = () => deadline - Date.now();
   const errors: string[] = [];
   for (const model of models) {
+    if (left() < 25_000) break;
     try {
-      const draft = await callGemini(model, key, generatePrompt(level, n));
+      const draft = await callGemini(model, key, generatePrompt(level, n), Math.min(80_000, left() - 5_000));
       let reviewed = draft;
-      try {
-        reviewed = await callGemini(model, key, reviewPrompt(draft));
-      } catch (e) {
-        errors.push(`review ${String(e)}`); // keep the draft if the review pass fails
+      if (left() > 30_000) {
+        try {
+          reviewed = await callGemini(model, key, reviewPrompt(draft), left() - 5_000);
+        } catch (e) {
+          errors.push(`review ${String(e)}`); // keep the draft if the review pass fails
+        }
+      } else {
+        errors.push(`${model}: review skipped (time)`);
       }
       const items = clean(reviewed, n);
       if (items.length >= Math.min(5, n)) return json({ items, model });
