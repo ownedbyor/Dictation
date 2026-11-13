@@ -285,18 +285,19 @@ function next(first){ checked=false; hinted=false; var it=items[i], g=gOf(it), d
  if(!S.kb){ $('ans').focus(); }
  if(first || S.auto){ setTimeout(function(){ sayItem(); },150); } }
 function useHint(){ if(checked || hinted){ return; } hinted=true; $('hint').disabled=true; var it=items[i], g=gOf(it), w=norm(it.w,g); $('ans').placeholder='מתחילה ב־'+w[0]+' ('+w.length+' אותיות)';
- speak([{ t: g==='en' ? PH.he.enStarts(w[0].toLowerCase()) : PH.he.starts(w[0]), g:'he' }]); }
+ speak(g==='en' ? [{ t:PH.he.startsL, g:'he' },{ t:PH.en.letter(w[0]), g:'en' }] : [{ t:PH.he.starts(w[0]), g:'he' }]); }
 function letterDiff(a,it){ var g=gOf(it), A=norm(a,g), W=norm(it.w,g), h=''; for(var k=0;k<W.length;k++){ var bad = A.length!==W.length || A[k]!==W[k]; h+='<span'+(bad ? ' class=bad' : '')+'>'+W[k]+'</span>'; } return h; }
 function diffAt(a,it){ var g=gOf(it), A=norm(a,g), W=norm(it.w,g), d=[]; if(A.length===W.length){ for(var k=0;k<W.length;k++){ if(A[k]!==W[k]){ d.push(k); } } } return d.length===1 ? { right:W[d[0]], wrong:A[d[0]] } : null; }
 // Correction: name the wrong letter (when exactly one is wrong), then spell the right word letter by letter.
 // Each Hebrew letter is its own clip; `hl` highlights that letter on screen while it is read.
-// English corrections are spoken in Hebrew too: "כמעט! כותבים house עם אִי, ולא עם אֵיי. כותבים כך: אֵייצ'. אוֹ. ..."
-function wrongParts(a,it){ var g=gOf(it), H=PH.he, x=diffAt(a,it), parts=[{ t:H.almost, g:'he' }];
+// English corrections are spoken in Hebrew, with only the word and the letters in English:
+// "כמעט! כותבים house עם E ולא עם A. כותבים כך: H. O. U. S. E."
+function wrongParts(a,it){ var g=gOf(it), H=PH.he, E=PH.en, x=diffAt(a,it), parts=[{ t:H.almost, g:'he' }];
  if(g==='en'){
-  var lo=function(c){ return String(c || '').toLowerCase(); };
-  if(x && PH.ENQ[lo(x.right)] && PH.ENQ[lo(x.wrong)]){ parts.push({ t:H.writes, g:'he' },{ t:PH.en.word(it.w), g:'en' },{ t:H.withEn(lo(x.right)), g:'he' },{ t:H.notWithEn(lo(x.wrong)), g:'he' }); }
+  var isL=function(c){ return /^[a-z]$/i.test(c || ''); };
+  if(x && isL(x.right) && isL(x.wrong)){ parts.push({ t:H.writes, g:'he' },{ t:E.word(it.w), g:'en' },{ t:H.withL, g:'he' },{ t:E.letter(x.right), g:'en' },{ t:H.notWithL, g:'he' },{ t:E.letter(x.wrong), g:'en' }); }
   parts.push({ t:H.spellIntro, g:'he' });
-  it.w.split('').forEach(function(c,k){ if(PH.ENQ[lo(c)]){ parts.push({ t:H.enLetter(lo(c)), g:'he', hl:k }); } });
+  it.w.split('').forEach(function(c,k){ if(isL(c)){ parts.push({ t:E.letter(c), g:'en', hl:k }); } });
   return parts; }
  if(x){ parts.push({ t:H.write(x.right), g:'he' },{ t:H.not(x.wrong), g:'he' }); }
  parts.push({ t:H.spellIntro, g:'he' });

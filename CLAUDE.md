@@ -28,7 +28,7 @@ Supabase project ref: `ugtqcfrtstfpzbhxybdm` (region eu-central-1).
 ## Speech
 
 - Every spoken line is a list of parts `[{ t, g }]` passed to `speak(parts, rate)`. Prefer fixed phrases from `phrases.js` (letter names carry full niqqud so they are read correctly).
-- Corrections: "כִּמְעַט!", then (if exactly one letter is wrong) "כּוֹתְבִים חֵית. וְלֹא כָּף.", then the correct word spelled letter by letter, one clip per letter ("כּוֹתְבִים כָּךְ: מֵם. חֵית. ..."). Parts with `hl:k` highlight letter k of the on-screen word while it is read. English corrections are spoken in Hebrew too ("כִּמְעַט! כּוֹתְבִים house. עִם אִי, וְלֹא עִם אֵיי. כּוֹתְבִים כָּךְ: אֵייצ'. אוֹ. ..."), with English letter names from `PH.ENQ`; only the English word itself is an English clip.
+- Corrections: "כִּמְעַט!", then (if exactly one letter is wrong) "כּוֹתְבִים חֵית. וְלֹא כָּף.", then the correct word spelled letter by letter, one clip per letter ("כּוֹתְבִים כָּךְ: מֵם. חֵית. ..."). Parts with `hl:k` highlight letter k of the on-screen word while it is read. English corrections are spoken in Hebrew with only the word and the letters in English ("כִּמְעַט! כּוֹתְבִים | house. | עִם | E. | וְלֹא עִם | A. | כּוֹתְבִים כָּךְ: | H. | O. ..."), each piece its own clip in its own language.
 - Fixed clips are pre-rendered by the `tts-warm` cron job (queue `private.tts_warm`, unschedules itself when done) or by `node tools/warm-phrases.mjs`. After changing any phrase text, re-run the warm script.
 - Gemini TTS on a free key allows only ~15 clips per model per day (HTTP 429 afterwards); that is why Google Cloud TTS is the primary provider.
 
