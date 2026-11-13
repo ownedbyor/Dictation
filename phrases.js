@@ -9,17 +9,30 @@
     'נ': 'נוּן', 'ן': 'נוּן סוֹפִית', 'ס': 'סָמֶךְ', 'ע': 'עַיִן', 'פ': 'פֵּא', 'ף': 'פֵּא סוֹפִית', 'צ': 'צָדִי',
     'ץ': 'צָדִי סוֹפִית', 'ק': 'קוֹף', 'ר': 'רֵישׁ', 'ש': 'שִׁין', 'ת': 'תָּו'
   };
+  // English letter names as Hebrew speakers say them, with niqqud, so English corrections can be spoken in Hebrew.
+  var ENQ = {
+    a: 'אֵיי', b: 'בִּי', c: 'סִי', d: 'דִּי', e: 'אִי', f: 'אֶף', g: "גִ'י", h: "אֵייצ'", i: 'אַיי', j: "גֵ'יי",
+    k: 'קֵיי', l: 'אֶל', m: 'אֶם', n: 'אֶן', o: 'אוֹ', p: 'פִּי', q: 'קְיוּ', r: 'אָר', s: 'אֶס', t: 'טִי',
+    u: 'יוּ', v: 'וִי', w: 'דַּאבֶּל יוּ', x: 'אֶקְס', y: 'וַואי', z: 'זֶד'
+  };
   var FINALS = 'ךםןףץ';
   var ABC = 'abcdefghijklmnopqrstuvwxyz';
 
   var PH = {
     LNQ: LNQ,
+    ENQ: ENQ,
     he: {
       write: function (c) { return 'כּוֹתְבִים ' + LNQ[c] + '.'; },
       not: function (c) { return 'וְלֹא ' + LNQ[c] + '.'; },
       starts: function (c) { return 'הַמִּלָּה מַתְחִילָה בָּאוֹת ' + LNQ[c] + '.'; },
       letter: function (c) { return LNQ[c] + '.'; },
       spellIntro: 'כּוֹתְבִים כָּךְ:',
+      // English corrections, spoken in Hebrew: "כּוֹתְבִים" + (English word) + "עִם אִי," + "וְלֹא עִם אֵיי."
+      writes: 'כּוֹתְבִים',
+      withEn: function (c) { return 'עִם ' + ENQ[c] + ','; },
+      notWithEn: function (c) { return 'וְלֹא עִם ' + ENQ[c] + '.'; },
+      enLetter: function (c) { return ENQ[c] + '.'; },
+      enStarts: function (c) { return 'הַמִּלָּה מַתְחִילָה בָּאוֹת ' + ENQ[c] + '.'; },
       almost: 'כִּמְעַט!',
       look: 'כִּמְעַט! תִּסְתַּכְּלִי עַל הָאוֹתִיּוֹת הָאֲדֻמּוֹת.',
       done: 'סִיַּמְתְּ! כׇּל הַכָּבוֹד!',
@@ -30,6 +43,7 @@
       write: function (c) { return 'Write ' + c + '.'; },
       not: function (c) { return 'Not ' + c + '.'; },
       starts: function (c) { return 'It starts with the letter ' + c + '.'; },
+      word: function (w) { return w + '.'; },
       spelled: function (w) { return w + ' is spelled: ' + w.split('').join(', ') + '.'; },
       almost: 'Almost!',
       look: 'Almost! Look at the red letters.',
@@ -45,13 +59,13 @@
         if (FINALS.indexOf(c) < 0) { out.push({ text: he.starts(c), lang: 'he' }); }
       });
       [he.almost, he.spellIntro, he.done, he.test].concat(he.praise).forEach(function (t) { out.push({ text: t, lang: 'he' }); });
+      out.push({ text: he.writes, lang: 'he' });
       ABC.split('').forEach(function (c) {
-        out.push({ text: en.write(c), lang: 'en' }, { text: en.not(c), lang: 'en' }, { text: en.starts(c), lang: 'en' });
+        out.push({ text: he.enLetter(c), lang: 'he' }, { text: he.withEn(c), lang: 'he' }, { text: he.notWithEn(c), lang: 'he' }, { text: he.enStarts(c), lang: 'he' });
       });
-      [en.almost].concat(en.praise).forEach(function (t) { out.push({ text: t, lang: 'en' }); });
+      en.praise.forEach(function (t) { out.push({ text: t, lang: 'en' }); });
       (enItems || []).forEach(function (it) {
-        out.push({ text: PH.item(it), lang: 'en' }, { text: en.spelled(it.w), lang: 'en' });
-        (it.alt || []).forEach(function (a) { out.push({ text: en.spelled(a), lang: 'en' }); });
+        out.push({ text: PH.item(it), lang: 'en' }, { text: en.word(it.w), lang: 'en' });
       });
       return out;
     }

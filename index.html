@@ -285,15 +285,21 @@ function next(first){ checked=false; hinted=false; var it=items[i], g=gOf(it), d
  if(!S.kb){ $('ans').focus(); }
  if(first || S.auto){ setTimeout(function(){ sayItem(); },150); } }
 function useHint(){ if(checked || hinted){ return; } hinted=true; $('hint').disabled=true; var it=items[i], g=gOf(it), w=norm(it.w,g); $('ans').placeholder='מתחילה ב־'+w[0]+' ('+w.length+' אותיות)';
- speak([{ t: g==='en' ? PH.en.starts(w[0]) : PH.he.starts(w[0]), g:g }]); }
+ speak([{ t: g==='en' ? PH.he.enStarts(w[0].toLowerCase()) : PH.he.starts(w[0]), g:'he' }]); }
 function letterDiff(a,it){ var g=gOf(it), A=norm(a,g), W=norm(it.w,g), h=''; for(var k=0;k<W.length;k++){ var bad = A.length!==W.length || A[k]!==W[k]; h+='<span'+(bad ? ' class=bad' : '')+'>'+W[k]+'</span>'; } return h; }
 function diffAt(a,it){ var g=gOf(it), A=norm(a,g), W=norm(it.w,g), d=[]; if(A.length===W.length){ for(var k=0;k<W.length;k++){ if(A[k]!==W[k]){ d.push(k); } } } return d.length===1 ? { right:W[d[0]], wrong:A[d[0]] } : null; }
 // Correction: name the wrong letter (when exactly one is wrong), then spell the right word letter by letter.
 // Each Hebrew letter is its own clip; `hl` highlights that letter on screen while it is read.
-function wrongParts(a,it){ var g=gOf(it), P= g==='en' ? PH.en : PH.he, x=diffAt(a,it), parts=[{ t:P.almost, g:g }];
- if(x){ parts.push({ t:P.write(x.right), g:g },{ t:P.not(x.wrong), g:g }); }
- if(g==='en'){ parts.push({ t:PH.en.spelled(it.w), g:'en' }); return parts; }
- parts.push({ t:PH.he.spellIntro, g:'he' });
+// English corrections are spoken in Hebrew too: "כמעט! כותבים house עם אִי, ולא עם אֵיי. כותבים כך: אֵייצ'. אוֹ. ..."
+function wrongParts(a,it){ var g=gOf(it), H=PH.he, x=diffAt(a,it), parts=[{ t:H.almost, g:'he' }];
+ if(g==='en'){
+  var lo=function(c){ return String(c || '').toLowerCase(); };
+  if(x && PH.ENQ[lo(x.right)] && PH.ENQ[lo(x.wrong)]){ parts.push({ t:H.writes, g:'he' },{ t:PH.en.word(it.w), g:'en' },{ t:H.withEn(lo(x.right)), g:'he' },{ t:H.notWithEn(lo(x.wrong)), g:'he' }); }
+  parts.push({ t:H.spellIntro, g:'he' });
+  it.w.split('').forEach(function(c,k){ if(PH.ENQ[lo(c)]){ parts.push({ t:H.enLetter(lo(c)), g:'he', hl:k }); } });
+  return parts; }
+ if(x){ parts.push({ t:H.write(x.right), g:'he' },{ t:H.not(x.wrong), g:'he' }); }
+ parts.push({ t:H.spellIntro, g:'he' });
  heOnly(it.w).split('').forEach(function(c,k){ parts.push({ t:PH.he.letter(c), g:'he', hl:k }); });
  return parts; }
 var PRAISE=['מצוין!','כל הכבוד!','יפה מאוד!','נכון!','אלופה!','בדיוק ככה!'];
@@ -305,7 +311,7 @@ function check(){ if(checked){ advance(); return; } var it=items[i], g=gOf(it), 
   sOk(); speak([{ t:(g==='en' ? PH.en.praise : PH.he.praise)[pi], g:g }]);
   if(hard[key] && !hard[key].del){ hard[key].ok=(hard[key].ok || 0)+1; hard[key].u=Date.now(); if(mode==='hard' && hard[key].ok>=2){ hard[key]={ w:it.w, del:true, u:Date.now() }; } }
  } else { results[i]='no'; wrong.push(it);
-  var x=diffAt(a,it), sw= x ? '<div class=swap dir='+(g==='en' ? 'ltr' : 'rtl')+'><b>'+esc(x.right)+'</b><span>'+(g==='en' ? 'not' : 'ולא')+'</span><s>'+esc(x.wrong)+'</s></div>' : '';
+  var x=diffAt(a,it), sw= x ? '<div class=swap dir=rtl><b>'+esc(x.right)+'</b><span>ולא</span><s>'+esc(x.wrong)+'</s></div>' : '';
   fb.innerHTML='<div class=verdict>כמעט!</div><div class=mine>כתבת: <s>'+esc(a)+'</s></div>'+wd+letterDiff(a,it)+'</div>'+sw+mean+'<p class=tip>💡 '+esc(it.t)+'</p>';
   sNo(); speak(wrongParts(a,it));
   hard[key]={ w:it.w, s:it.s, t:it.t, wn:it.wn, sn:it.sn, g:it.g, h:it.h, v:it.v, c:it.c, e:it.e, alt:it.alt, miss:((hard[key] && !hard[key].del && hard[key].miss) || 0)+1, ok:0, u:Date.now() };
