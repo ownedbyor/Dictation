@@ -34,7 +34,7 @@ Supabase project ref: `ugtqcfrtstfpzbhxybdm` (region eu-central-1).
 
 ## English word bank
 
-Fixed, hand-checked lists `EN_NUM` (1–20) and `EN_COL` (11 colors) in `index.html`. To add a topic: add an array in the same shape, a button in `#topics`, and a branch in `enList()`. Every sentence must contain its word exactly.
+Fixed, hand-checked lists `EN_NUM` (1–20), `EN_COL` (11 colors) and `EN_WRD` (class words, emoji cue `e`) in `index.html`. To add a topic: add an array in the same shape, a button in `#topics`, and a branch in `enList()`. Every sentence must contain its word exactly.
 
 ## Deploying
 

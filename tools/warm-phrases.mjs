@@ -13,14 +13,14 @@ const SB_URL = 'https://ugtqcfrtstfpzbhxybdm.supabase.co';
 const html = read('index.html');
 const ANON = /var SBK='([^']+)'/.exec(html)[1];
 
-// Load phrases.js and the English bank (EN_NUM / EN_COL) from index.html in a sandbox.
+// Load phrases.js and the English bank (EN_NUM / EN_COL / EN_WRD) from index.html in a sandbox.
 const ctx = { globalThis: {}, window: undefined, S: { topic: 'all' } };
 ctx.globalThis = ctx;
 vm.createContext(ctx);
 vm.runInContext(read('phrases.js'), ctx);
 const script = html.split('<script>')[1];
 const bank = script.slice(script.indexOf('var EN_NUM'), script.indexOf('var EN_PRAISE'));
-vm.runInContext(bank + '\nglobalThis.EN = EN_NUM.concat(EN_COL);', ctx);
+vm.runInContext(bank + '\nglobalThis.EN = EN_NUM.concat(EN_COL, EN_WRD);', ctx);
 
 let todo = ctx.PH.all(ctx.EN);
 console.log(`${todo.length} clips`);

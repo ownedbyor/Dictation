@@ -64,6 +64,7 @@ canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:5}
 .opt{margin-bottom:16px}
 .opt h3{font-size:16px;font-weight:500;color:var(--muted);margin:0 0 8px}
 .seg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+#topics{grid-template-columns:repeat(2,1fr)}
 .seg button{border:2px solid var(--line);border-radius:14px;padding:12px 6px;background:var(--paper);color:var(--ink);font-family:var(--body);font-size:17px;cursor:pointer;line-height:1.3}
 .seg button small{display:block;color:var(--muted);font-size:13px}
 .seg.two{grid-template-columns:repeat(2,1fr)}
@@ -93,7 +94,7 @@ canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:5}
 <div class='opt'><h3>רמת קושי</h3><div class='seg' id='lvls'><button data-l='easy'>🌱 קל<small>מילים קצרות</small></button><button data-l='medium'>🌿 בינוני<small>כיתה ד׳</small></button><button data-l='hard'>🌳 קשה<small>אתגר!</small></button></div></div>
 <div class='opt'><h3>כמה מילים?</h3><div class='count'><input type='range' id='cnt' min='20' max='50' step='5' aria-label='מספר מילים'><output id='cntOut'>20</output></div></div>
 </div>
-<div id='enOpts' hidden><div class='opt'><h3>מה מתרגלים?</h3><div class='seg' id='topics'><button data-t='num'>🔢 מספרים<small>1 עד 20</small></button><button data-t='col'>🎨 צבעים<small>11 צבעים</small></button><button data-t='all'>🌈 הכל<small>31 מילים</small></button></div></div></div>
+<div id='enOpts' hidden><div class='opt'><h3>מה מתרגלים?</h3><div class='seg' id='topics'><button data-t='num'>🔢 מספרים<small>1 עד 20</small></button><button data-t='col'>🎨 צבעים<small>11 צבעים</small></button><button data-t='wrd'>📚 מילים מהכיתה<small>10 מילים</small></button><button data-t='all'>🌈 הכל<small>41 מילים</small></button></div></div></div>
 <button class='big' id='startBtn'>✏️ מתחילים</button>
 <button class='ghost' id='hardBtn' hidden></button>
 <p class='small' id='lastLine'></p>
@@ -143,7 +144,7 @@ if(S.voice!=='device'){ S.voice='auto'; }
 if(['easy','medium','hard'].indexOf(S.level)<0){ S.level='medium'; }
 S.count=Math.min(50,Math.max(20,parseInt(S.count,10) || 20));
 if(['he','en'].indexOf(S.lang)<0){ S.lang='he'; }
-if(['num','col','all'].indexOf(S.topic)<0){ S.topic='all'; }
+if(['num','col','wrd','all'].indexOf(S.topic)<0){ S.topic='all'; }
 var LVL={ easy:'קלה', medium:'בינונית', hard:'קשה' };
 var LBL={ easy:'רמה קלה', medium:'רמה בינונית', hard:'רמה קשה', 'en-num':'מספרים באנגלית', 'en-col':'צבעים באנגלית', 'en-all':'מספרים וצבעים באנגלית' };
 
@@ -183,8 +184,21 @@ var EN_COL=[
  ['brown','The bear is brown.','חום','ow באמצע','#6d4c41'],
  ['gray','The elephant is gray.','אפור','ay בסוף. גם grey נחשב נכון','#9e9e9e']
 ].map(function(a){ var o={ w:a[0], s:a[1], h:a[2], t:a[3], g:'en', c:a[4] }; if(a[0]==='gray'){ o.alt=['grey']; } return o; });
+// Class word list (added 2026-11-13). Every sentence contains its word exactly, in lower case.
+var EN_WRD=[
+ ['friend','My best friend lives near me.','חבר / חברה','ie באמצע: f-r-i-e-n-d','👫'],
+ ['grade','I am in fourth grade.','כיתה (שכבה), ציון','e שקטה בסוף: g-r-a-d-e','📝'],
+ ['house','We live in a big house.','בית','ou באמצע ו-e שקטה בסוף','🏠'],
+ ['new','I have a new pencil.','חדש','ew בסוף: n-e-w','✨'],
+ ['school','I walk to school every day.','בית ספר','sch בהתחלה ו-oo באמצע','🏫'],
+ ['teacher','Our teacher reads us a story.','מורה','ea באמצע ו-er בסוף','👩‍🏫'],
+ ['town','I live in a small town.','עיירה','ow באמצע: t-o-w-n','🏘️'],
+ ['brother','My little brother likes to play.','אח','o באמצע ו-th: b-r-o-t-h-e-r','👦'],
+ ['sister','My sister has long hair.','אחות','s-i-s-t-e-r, er בסוף','👧'],
+ ['bird','The bird sings in the tree.','ציפור','ir באמצע: b-i-r-d','🐦']
+].map(function(a){ return { w:a[0], s:a[1], h:a[2], t:a[3], g:'en', e:a[4] }; });
 var EN_PRAISE=['Great!','Well done!','Excellent!','Perfect!','Super!','Good job!'];
-function enList(){ return S.topic==='num' ? EN_NUM : S.topic==='col' ? EN_COL : EN_NUM.concat(EN_COL); }
+function enList(){ return S.topic==='num' ? EN_NUM : S.topic==='col' ? EN_COL : S.topic==='wrd' ? EN_WRD : EN_NUM.concat(EN_COL,EN_WRD); }
 function shuffle(a){ a=a.slice(); for(var k=a.length-1;k>0;k--){ var j=Math.floor(Math.random()*(k+1)); var t=a[k]; a[k]=a[j]; a[j]=t; } return a; }
 function gOf(it){ return it && it.g==='en' ? 'en' : 'he'; }
 function norm(s,g){ s=String(s||''); if(g==='en'){ return s.toLowerCase().replace(/[^a-z]/g,''); } return heOnly(s); }
@@ -263,7 +277,7 @@ function show(view){ ['vStart','vLoad','vQuiz','vDone','vSet'].forEach(function(
 function begin(list,m){ if(!list.length){ location.reload(); return; } mode=m; items=list.slice(); i=0; score=0; wrong=[]; sessStars=0; results=items.map(function(){ return ''; }); show('vQuiz'); buildKb(); warmItems(items); next(true); }
 function dots(){ var h=''; for(var k=0;k<items.length;k++){ h+='<span class='+(k===i ? 'dot cur' : 'dot '+results[k])+'></span>'; } $('dots').innerHTML=h; }
 function sayItem(rate){ var it=items[i]; return speak([{ t:PH.item(it), g:gOf(it) }],rate); }
-function renderCue(it){ var c=$('cue'); if(it.c){ c.innerHTML='<span class=swatch style=background:'+it.c+'></span>'; c.hidden=false; } else if(it.v){ c.innerHTML='<span class=digit>'+it.v+'</span>'; c.hidden=false; } else { c.innerHTML=''; c.hidden=true; } }
+function renderCue(it){ var c=$('cue'); if(it.c){ c.innerHTML='<span class=swatch style=background:'+it.c+'></span>'; c.hidden=false; } else if(it.v){ c.innerHTML='<span class=digit>'+it.v+'</span>'; c.hidden=false; } else if(it.e){ c.innerHTML='<span class=digit>'+it.e+'</span>'; c.hidden=false; } else { c.innerHTML=''; c.hidden=true; } }
 function next(first){ checked=false; hinted=false; var it=items[i], g=gOf(it), dir= g==='en' ? 'ltr' : 'rtl'; $('progTxt').textContent='מילה '+(i+1)+' מתוך '+items.length; $('sessStars').textContent='⭐ '+sessStars; dots();
  renderCue(it); $('sent').dir=dir; $('ans').dir=dir; $('ans').setAttribute('lang',g); buildKb(g);
  $('sent').innerHTML = it.s.indexOf(it.w)>=0 ? esc(it.s).split(esc(it.w)).join('<span class=blank></span>') : '🎧 הקשיבי למשפט';
@@ -294,7 +308,7 @@ function check(){ if(checked){ advance(); return; } var it=items[i], g=gOf(it), 
   var x=diffAt(a,it), sw= x ? '<div class=swap dir='+(g==='en' ? 'ltr' : 'rtl')+'><b>'+esc(x.right)+'</b><span>'+(g==='en' ? 'not' : 'ולא')+'</span><s>'+esc(x.wrong)+'</s></div>' : '';
   fb.innerHTML='<div class=verdict>כמעט!</div><div class=mine>כתבת: <s>'+esc(a)+'</s></div>'+wd+letterDiff(a,it)+'</div>'+sw+mean+'<p class=tip>💡 '+esc(it.t)+'</p>';
   sNo(); speak(wrongParts(a,it));
-  hard[key]={ w:it.w, s:it.s, t:it.t, wn:it.wn, sn:it.sn, g:it.g, h:it.h, v:it.v, c:it.c, alt:it.alt, miss:((hard[key] && !hard[key].del && hard[key].miss) || 0)+1, ok:0, u:Date.now() };
+  hard[key]={ w:it.w, s:it.s, t:it.t, wn:it.wn, sn:it.sn, g:it.g, h:it.h, v:it.v, c:it.c, e:it.e, alt:it.alt, miss:((hard[key] && !hard[key].del && hard[key].miss) || 0)+1, ok:0, u:Date.now() };
  }
  store.set('hard',hard); store.set('stars',starsTot); queueSave(); dots(); $('sessStars').textContent='⭐ '+sessStars; renderHeader();
  $('go').textContent = i<items.length-1 ? 'למילה הבאה ←' : 'לסיכום 🎉'; $('go').focus(); }
